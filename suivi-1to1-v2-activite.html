@@ -1131,8 +1131,17 @@ function buildCardHeader(p,si,ni,openA){
     </div>`;
 }
 
+function buildCardTabs(p,historyCount,openActCount){
+  return`<!-- Tabs: Historique / Actions -->
+        <div class="card-tabs">
+          <div class="card-tab active" onclick="switchCardTab(this,'${DOM_ID.tabHist(p.id)}','${p.id}')">🗓️ Historique (${historyCount})</div>
+          <div class="card-tab" onclick="switchCardTab(this,'${DOM_ID.tabActs(p.id)}','${p.id}')">📋 Actions (${openActCount})</div>
+        </div>`;
+}
+
 function buildCardBody(p,history,e,activeClients,projRowsHtml,showDoneBtn,doneSection,actsHtml,histHtml){
   const openActCount=(e?.actions||[]).filter(a=>!a.done).length;
+  const tabsHtml=buildCardTabs(p,history.length,openActCount);
   return`<div class="card-body" id="${DOM_ID.cardBody(p.id)}">
       <div class="card-body-inner">
         <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:12px;padding-bottom:10px;border-bottom:1px solid var(--border);">
@@ -1162,11 +1171,7 @@ function buildCardBody(p,history,e,activeClients,projRowsHtml,showDoneBtn,doneSe
           <input class="inp-comment" type="text" id="${DOM_ID.newClientComment(p.id)}" placeholder="Commentaire">
           <button class="add-client-btn" onclick="addClient('${p.id}')">+ Ajouter</button>
         </div>
-        <!-- Tabs: Historique / Actions -->
-        <div class="card-tabs">
-          <div class="card-tab active" onclick="switchCardTab(this,'${DOM_ID.tabHist(p.id)}','${p.id}')">🗓️ Historique (${history.length})</div>
-          <div class="card-tab" onclick="switchCardTab(this,'${DOM_ID.tabActs(p.id)}','${p.id}')">📋 Actions (${openActCount})</div>
-        </div>
+        ${tabsHtml}
         <div id="${DOM_ID.tabHist(p.id)}" class="card-tab-panel active">
           ${history.length
             ? `<div style="display:flex;justify-content:flex-end;gap:6px;margin-bottom:8px;">
