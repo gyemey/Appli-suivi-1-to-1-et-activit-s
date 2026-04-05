@@ -1816,8 +1816,19 @@ function refreshCard(pid){
   const cardEl=document.getElementById(DOM_ID.card(pid));
   if(!cardEl)return;
   const wasOpen=document.getElementById(DOM_ID.cardBody(pid))?.classList.contains('open');
+  // Mémoriser l'onglet actif avant destruction
+  const activePanel=cardEl.querySelector('.card-tab-panel.active');
+  const activeTabIdx=activePanel?.id===DOM_ID.tabActs(pid)?1:0;
+
   cardEl.outerHTML=renderPersonCard(p);
+
+  const newCardEl=document.getElementById(DOM_ID.card(pid));
   if(wasOpen)document.getElementById(DOM_ID.cardBody(pid))?.classList.add('open');
+  // Restaurer l'onglet actif si ce n'était pas le premier
+  if(newCardEl&&activeTabIdx===1){
+    const tab=newCardEl.querySelectorAll('.card-tab')[1];
+    if(tab) switchCardTab(tab,DOM_ID.tabActs(pid),pid);
+  }
   requestAnimationFrame(()=>{
     document.querySelectorAll('select[id^="statut-'+pid+'"]').forEach(sel=>{
       const opt=sel.options[sel.selectedIndex];if(opt&&opt.dataset.style)sel.style.cssText=opt.dataset.style;
