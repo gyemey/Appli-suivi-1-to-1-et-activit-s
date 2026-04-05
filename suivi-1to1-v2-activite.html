@@ -385,8 +385,14 @@
         <div style="display:flex;gap:8px;">
           <button class="btn btn-sm" onclick="syncActivityFromPortfolios()" title="Synchroniser depuis les portefeuilles individuels" style="color:var(--navy);border-color:var(--border);background:var(--surface2);">🔄 Synchroniser</button>
           <button class="btn btn-sm" onclick="exportActivityExcel()" style="color:var(--navy);border-color:var(--border);background:var(--surface2);">⬇️ Export XLS</button>
+          <button class="btn btn-sm" onclick="resetActivity()" title="Remettre à zéro le suivi d'activité" style="color:#C0392B;border-color:#FDDEDE;background:#FFF5F5;">🗑️ RAZ</button>
           <button class="btn btn-sm btn-primary" onclick="openAddActivityProject()">+ Ajouter un projet</button>
         </div>
+      </div>
+      <div id="act-undo-bar" style="display:none;align-items:center;gap:12px;padding:10px 14px;margin-bottom:10px;background:#FFF5EC;border:1px solid #FFD5B0;border-radius:8px;font-size:13px;color:var(--navy);">
+        <span>🗑️ Suivi d'activité réinitialisé.</span>
+        <button onclick="undoActivityReset()" style="font-size:12px;padding:4px 12px;border-radius:8px;border:1px solid var(--accent);background:#fff;color:var(--accent);cursor:pointer;font-weight:600;">↩ Annuler</button>
+        <div id="act-undo-progress" style="flex:1;height:4px;border-radius:2px;background:#FFD5B0;overflow:hidden;"><div id="act-undo-bar-fill" style="height:100%;width:100%;background:var(--accent);transition:width 300s linear;"></div></div>
       </div>
       <div style="display:flex;gap:8px;align-items:center;margin-bottom:1rem;flex-wrap:wrap;">
         <input type="text" placeholder="Rechercher un projet…" id="act-search" oninput="renderActivity()" style="font-size:13px;padding:7px 12px;border:1px solid var(--border);border-radius:var(--radius);min-width:200px;outline:none;">
@@ -3025,6 +3031,73 @@ function saveActMeteo(pi,sel){const proj=db.activityProjects[pi];if(!proj)return
 function toggleActStatut(pi){const proj=db.activityProjects[pi];if(!proj)return;proj.statut=proj.statut==='RUN'?'BUILD':'RUN';saveData();renderActivity();}
 function saveConsField(pi,ci,field,val){const proj=db.activityProjects[pi];if(!proj||!proj.consultants[ci])return;proj.consultants[ci][field]=val;saveData();}
 function saveConsMeteo(pi,ci,sel){const proj=db.activityProjects[pi];if(!proj||!proj.consultants[ci])return;proj.consultants[ci].meteo=sel.value;const m=meteoObj(sel.value||proj.meteo);sel.style.background=m.bg;sel.style.color=m.color;saveData();}
+
+// ── RAZ SUIVI D'ACTIVITÉ avec annulation (5 minutes) ─────────────────────────
+// _activitySnapshot : copie mémoire de db.activityProjects (jamais en localStorage)
+// _activityUndoTimer : setTimeout de 300 000 ms pour l'expiration
+// _activityUndoInterval : setInterval d'1 s pour le décompte affiché
+let _activitySnapshot=null;
+let _activityUndoTimer=null;
+let _activityUndoInterval=null;
+
+const ACTIVITY_UNDO_DELAY=300000; // 5 minutes en ms
+
+function _formatUndoCountdown(remainingMs){
+  const s=Math.ceil(remainingMs/1000);
+  const m=Math.floor(s/60);
+  const sec=s%60;
+  return m+':'+(sec<10?'0':'')+sec;
+}
+
+function resetActivity(){
+  if(!db.activityProjects.length){toast('Aucun projet à réinitialiser');return;}
+  // Sauvegarder l'état en mémoire (deep copy)
+  _activitySnapshot=JSON.parse(JSON.stringify(db.activityProjects));
+  // Effacer
+  db.activityProjects=[];
+  saveData();
+  renderActivity();
+  // Afficher le bandeau
+  const bar=document.getElementById('act-undo-bar');
+  const fill=document.getElementById('act-undo-bar-fill');
+  const btn=bar.querySelector('button');
+  bar.style.display='flex';
+  // Animation barre de progression
+  requestAnimationFrame(()=>{fill.style.width='100%';requestAnimationFrame(()=>{fill.style.width='0%';});});
+  // Décompte affiché sur le bouton
+  const start=Date.now();
+  clearInterval(_activityUndoInterval);
+  btn.textContent='↩ Annuler le RAZ ('+_formatUndoCountdown(ACTIVITY_UNDO_DELAY)+')';
+  _activityUndoInterval=setInterval(()=>{
+    const elapsed=Date.now()-start;
+    const remaining=ACTIVITY_UNDO_DELAY-elapsed;
+    if(remaining<=0){clearInterval(_activityUndoInterval);return;}
+    btn.textContent='↩ Annuler le RAZ ('+_formatUndoCountdown(remaining)+')';
+  },1000);
+  // Expiration après 5 minutes
+  clearTimeout(_activityUndoTimer);
+  _activityUndoTimer=setTimeout(()=>hideActivityUndoBar(),ACTIVITY_UNDO_DELAY);
+}
+
+function undoActivityReset(){
+  if(!_activitySnapshot)return;
+  db.activityProjects=_activitySnapshot;
+  _activitySnapshot=null;
+  clearTimeout(_activityUndoTimer);
+  clearInterval(_activityUndoInterval);
+  saveData();
+  renderActivity();
+  hideActivityUndoBar();
+  toast('Suivi d\'activité restauré ✓');
+}
+
+function hideActivityUndoBar(){
+  clearInterval(_activityUndoInterval);
+  _activityUndoInterval=null;
+  _activitySnapshot=null;
+  const bar=document.getElementById('act-undo-bar');
+  if(bar) bar.style.display='none';
+}
 
 function openAddActivityProject(){
   document.getElementById('act-new-name').value='';
