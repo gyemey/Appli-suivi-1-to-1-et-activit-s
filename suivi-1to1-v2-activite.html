@@ -1027,27 +1027,14 @@ function cycleAvancement(pid,ci){
   if(el)el.textContent=p.clients[ci].avancement||AVANCEMENT_OPTIONS[0];
 }
 
-function renderPersonCard(p){
-  const freq=personFreq(p);
-  const e=lastE(p.id);
-  const history=allE(p.id);
-  const days=daysSince(e?.date);
-  const si=statusInfo(days,freq);
-  const ni=nextEntretienInfo(p);
-  const openA=(e?.actions||[]).filter(a=>!a.done);
-  const rIcon=roleIcon(p.role);
-  const specs=(p.specialties||[]).map(s=>`<span class="spec">${s}</span>`).join('');
-  const locationIcon=p.location.includes('Strasbourg')?'📍':'📍';
-
+function buildActiveProjectRows(p){
   const activeClients=(p.clients||[]).filter(c=>!c.done);
-  const doneClients=(p.clients||[]).filter(c=>c.done);
-
-  // Project table rows (active)
-  const projRowsHtml=activeClients.map(c=>{
+  return activeClients.map(c=>{
     const ci=(p.clients||[]).indexOf(c);
     const statut=c.statut||'RUN';
     const avanc=c.avancement||'';
-    const rawMeteo=c.meteo||'';const meteo=(typeof rawMeteo==='string'&&METEO_OPTIONS.some(m=>m.val===rawMeteo))?rawMeteo:'';
+    const rawMeteo=c.meteo||'';
+    const meteo=(typeof rawMeteo==='string'&&METEO_OPTIONS.some(m=>m.val===rawMeteo))?rawMeteo:'';
     const statutColor=statut==='RUN'?'background:#D4EDDA;color:#276749;':'background:#D6E4F0;color:#2B5070;';
     return`<tr id="cr-${p.id}-${ci}">
       <td style="width:22px;">
@@ -1077,7 +1064,11 @@ function renderPersonCard(p){
       <td style="width:24px;"><button class="proj-del" onclick="delClient('${p.id}',${ci})" title="Supprimer">×</button></td>
     </tr>`;
   }).join('');
+}
 
+function buildDoneProjectsSection(p){
+  const doneClients=(p.clients||[]).filter(c=>c.done);
+  if(!doneClients.length) return{showDoneBtn:'',doneSection:''};
   const doneRowsHtml=doneClients.map(c=>{
     const ci=(p.clients||[]).indexOf(c);
     return`<tr class="proj-done-row" id="cr-${p.id}-${ci}">
@@ -1086,11 +1077,14 @@ function renderPersonCard(p){
       <td><button class="proj-del" onclick="delClient('${p.id}',${ci})">×</button></td>
     </tr>`;
   }).join('');
+  const n=doneClients.length;
+  const showDoneBtn=`<button class="show-done-btn" onclick="toggleDoneClients(this)" data-pid="${p.id}">▸ ${n} projet${n>1?'s':''} terminé${n>1?'s':''}</button>`;
+  const doneSection=`<div id="${DOM_ID.doneClients(p.id)}" style="display:none;"><table class="project-table"><tbody>${doneRowsHtml}</tbody></table></div>`;
+  return{showDoneBtn,doneSection};
+}
 
-  const showDoneBtn=doneClients.length?`<button class="show-done-btn" onclick="toggleDoneClients(this)" data-pid="${p.id}">▸ ${doneClients.length} projet${doneClients.length>1?'s':''} terminé${doneClients.length>1?'s':''}</button>`:'';;
-  const doneSection=doneClients.length?`<div id="${DOM_ID.doneClients(p.id)}" style="display:none;"><table class="project-table"><tbody>${doneRowsHtml}</tbody></table></div>`:'';
-
-  const actsHtml=(e?.actions||[]).map(a=>`
+function buildActionsHtml(e){
+  return(e?.actions||[]).map(a=>`
     <div class="action-row">
       <div class="check${a.done?' done':''}" onclick="toggleAction('${e.id}','${a.id}');event.stopPropagation();">${a.done?'✓':''}</div>
       <span class="action-text${a.done?' done':''}">
@@ -1099,8 +1093,10 @@ function renderPersonCard(p){
       </span>
       <span class="action-owner-badge">${a.owner}</span>
     </div>`).join('');
+}
 
-  const histHtml=history.map(h=>`
+function buildHistoryHtml(p,history){
+  return history.map(h=>`
     <div class="history-entry">
       <div class="history-dot"></div>
       <div class="history-date">${fmtDate(h.date)}${h.mood?' · '+h.mood:''}</div>
@@ -1115,9 +1111,11 @@ function renderPersonCard(p){
           title="Supprimer cet entretien">🗑️</button>
       </div>
     </div>`).join('');
+}
 
-  return`<div class="card" id="${DOM_ID.card(p.id)}">
-    <div class="card-header" id="${DOM_ID.cardHeader(p.id)}" onclick="toggleCard('${DOM_ID.cardBody(p.id)}')">
+function buildCardHeader(p,si,ni,openA){
+  const rIcon=roleIcon(p.role);
+  return`<div class="card-header" id="${DOM_ID.cardHeader(p.id)}" onclick="toggleCard('${DOM_ID.cardBody(p.id)}')">
       <div class="avatar" style="${avStyle(p.colorIdx||0)}">${initials(p.name)}</div>
       <div class="person-info">
         <div class="person-name">${rIcon} ${p.name}</div>
@@ -1130,8 +1128,12 @@ function renderPersonCard(p){
         </span>
         ${openA.length?`<span class="badge badge-blue">📋 ${openA.length} action${openA.length>1?'s':''}</span>`:''}
       </div>
-    </div>
-    <div class="card-body" id="${DOM_ID.cardBody(p.id)}">
+    </div>`;
+}
+
+function buildCardBody(p,history,e,activeClients,projRowsHtml,showDoneBtn,doneSection,actsHtml,histHtml){
+  const openActCount=(e?.actions||[]).filter(a=>!a.done).length;
+  return`<div class="card-body" id="${DOM_ID.cardBody(p.id)}">
       <div class="card-body-inner">
         <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:12px;padding-bottom:10px;border-bottom:1px solid var(--border);">
 
@@ -1163,7 +1165,7 @@ function renderPersonCard(p){
         <!-- Tabs: Historique / Actions -->
         <div class="card-tabs">
           <div class="card-tab active" onclick="switchCardTab(this,'${DOM_ID.tabHist(p.id)}','${p.id}')">🗓️ Historique (${history.length})</div>
-          <div class="card-tab" onclick="switchCardTab(this,'${DOM_ID.tabActs(p.id)}','${p.id}')">📋 Actions (${(e?.actions||[]).filter(a=>!a.done).length})</div>
+          <div class="card-tab" onclick="switchCardTab(this,'${DOM_ID.tabActs(p.id)}','${p.id}')">📋 Actions (${openActCount})</div>
         </div>
         <div id="${DOM_ID.tabHist(p.id)}" class="card-tab-panel active">
           ${history.length
@@ -1186,8 +1188,29 @@ function renderPersonCard(p){
           <button class="btn btn-sm btn-primary" onclick="prepareNewFor('${p.id}');event.stopPropagation();">✏️ Manuel</button>
         </div>
       </div>
-    </div>
-  </div>`;
+    </div>`;
+}
+
+function renderPersonCard(p){
+  // Calcul d'état
+  const freq=personFreq(p);
+  const e=lastE(p.id);
+  const history=allE(p.id);
+  const days=daysSince(e?.date);
+  const si=statusInfo(days,freq);
+  const ni=nextEntretienInfo(p);
+  const openA=(e?.actions||[]).filter(a=>!a.done);
+  const activeClients=(p.clients||[]).filter(c=>!c.done);
+
+  // Construction des fragments HTML
+  const projRowsHtml=buildActiveProjectRows(p);
+  const{showDoneBtn,doneSection}=buildDoneProjectsSection(p);
+  const actsHtml=buildActionsHtml(e);
+  const histHtml=buildHistoryHtml(p,history);
+  const headerHtml=buildCardHeader(p,si,ni,openA);
+  const bodyHtml=buildCardBody(p,history,e,activeClients,projRowsHtml,showDoneBtn,doneSection,actsHtml,histHtml);
+
+  return`<div class="card" id="${DOM_ID.card(p.id)}">${headerHtml}${bodyHtml}</div>`;
 }
 
 
