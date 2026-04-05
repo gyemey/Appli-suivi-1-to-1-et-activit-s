@@ -1131,6 +1131,15 @@ function buildCardHeader(p,si,ni,openA){
     </div>`;
 }
 
+function buildCardActions(pid){
+  return`<div class="card-actions">
+          <button class="btn btn-sm" onclick="openProfile('${pid}');event.stopPropagation();" style="color:var(--navy);border-color:var(--border);background:var(--surface2);">👤 Fiche</button>
+          <button class="btn btn-sm" onclick="preparerEntretien('${pid}');event.stopPropagation();" style="color:#534AB7;border-color:#CECBF6;background:#EEEDFE;">✦ Préparer</button>
+          <button class="btn btn-sm" onclick="openPasteModalFor('${pid}');event.stopPropagation();" style="color:var(--accent);border-color:#FFD5B0;background:#FFF5EC;">✨ Saisie IA</button>
+          <button class="btn btn-sm btn-primary" onclick="prepareNewFor('${pid}');event.stopPropagation();">✏️ Manuel</button>
+        </div>`;
+}
+
 function buildHistoryTabPanel(p,history,histHtml){
   return`<div id="${DOM_ID.tabHist(p.id)}" class="card-tab-panel active">
           ${history.length
@@ -1190,12 +1199,7 @@ function buildCardBody(p,history,e,activeClients,projRowsHtml,showDoneBtn,doneSe
             ? `<div style="margin-bottom:4px;">${actsHtml}</div>`
             : `<div style="font-size:13px;color:var(--text3);padding:8px 0;">Aucune action en cours.</div>`}
         </div>
-        <div class="card-actions">
-          <button class="btn btn-sm" onclick="openProfile('${p.id}');event.stopPropagation();" style="color:var(--navy);border-color:var(--border);background:var(--surface2);">👤 Fiche</button>
-          <button class="btn btn-sm" onclick="preparerEntretien('${p.id}');event.stopPropagation();" style="color:#534AB7;border-color:#CECBF6;background:#EEEDFE;">✦ Préparer</button>
-          <button class="btn btn-sm" onclick="openPasteModalFor('${p.id}');event.stopPropagation();" style="color:var(--accent);border-color:#FFD5B0;background:#FFF5EC;">✨ Saisie IA</button>
-          <button class="btn btn-sm btn-primary" onclick="prepareNewFor('${p.id}');event.stopPropagation();">✏️ Manuel</button>
-        </div>
+        ${buildCardActions(p.id)}
       </div>
     </div>`;
 }
