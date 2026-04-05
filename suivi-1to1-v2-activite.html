@@ -1373,6 +1373,9 @@ const DOM_ID={
   projAvanc:        (pid,ci) =>`avanc-${pid}-${ci}`,
   projMeteo:        (pid,ci) =>`meteo-${pid}-${ci}`,
   actExpand:        pi       =>`act-exp-${pi}`,
+  puChk:            i        =>`pu-chk-${i}`,
+  puMeteo:          i        =>`pu-meteo-${i}`,
+  puComment:        i        =>`pu-comment-${i}`,
 };
 
 // ── CLÉ API ─────────────────────────────────────────────────────────────────
@@ -2507,13 +2510,13 @@ function openPortfolioModal(personId, updates, newProjects){
     html+=mergedUpdates.map((u,i)=>{
       const hasIA=u._fromIA;
       return '<div style="display:flex;align-items:center;gap:8px;padding:8px 0;border-bottom:1px solid var(--border);">'
-        +'<input type="checkbox" id="pu-chk-'+i+'" '+(hasIA?'checked':'')
+        +'<input type="checkbox" id="'+DOM_ID.puChk(i)+'" '+(hasIA?'checked':'')
         +' style="cursor:pointer;accent-color:var(--accent);flex-shrink:0;">'
         +'<div style="font-weight:600;font-size:12px;min-width:100px;flex:1;">'+u.client
         +(hasIA?'<span style="font-size:9px;background:#E8EDF2;color:#2B4054;padding:1px 5px;border-radius:8px;margin-left:5px;">IA</span>':'')
         +'</div>'
-        +meteoSelect(u.meteo,'pu-meteo-'+i)
-        +'<input type="text" id="pu-comment-'+i+'" value="'+( u.commentaire||'').replace(/"/g,'&quot;')+'" placeholder="Commentaire"'
+        +meteoSelect(u.meteo,DOM_ID.puMeteo(i))
+        +'<input type="text" id="'+DOM_ID.puComment(i)+'" value="'+( u.commentaire||'').replace(/"/g,'&quot;')+'" placeholder="Commentaire"'
         +' style="flex:2;font-size:11px;padding:4px 7px;border:1px solid var(--border);border-radius:6px;background:var(--surface2);">'
         +'</div>';
     }).join('');
@@ -2527,12 +2530,12 @@ function openPortfolioModal(personId, updates, newProjects){
       const sbg=u.statut==='BUILD'?'#D6E4F0':'#D4EDDA';
       const sfg=u.statut==='BUILD'?'#185FA5':'#1A6B3C';
       return '<div style="display:flex;align-items:center;gap:8px;padding:8px 0;border-bottom:1px solid var(--border);">'
-        +'<input type="checkbox" id="pu-chk-'+ni+'" checked style="cursor:pointer;accent-color:var(--accent);flex-shrink:0;">'
+        +'<input type="checkbox" id="'+DOM_ID.puChk(ni)+'" checked style="cursor:pointer;accent-color:var(--accent);flex-shrink:0;">'
         +'<div style="font-weight:600;font-size:12px;min-width:100px;flex:1;">'+u.client
         +'<span style="font-size:9px;background:'+sbg+';color:'+sfg+';padding:1px 5px;border-radius:8px;margin-left:5px;">'+(u.statut||'RUN')+'</span>'
         +'</div>'
-        +meteoSelect(u.meteo,'pu-meteo-'+ni)
-        +'<input type="text" id="pu-comment-'+ni+'" value="'+(u.commentaire||'').replace(/"/g,'&quot;')+'" placeholder="Commentaire"'
+        +meteoSelect(u.meteo,DOM_ID.puMeteo(ni))
+        +'<input type="text" id="'+DOM_ID.puComment(ni)+'" value="'+(u.commentaire||'').replace(/"/g,'&quot;')+'" placeholder="Commentaire"'
         +' style="flex:2;font-size:11px;padding:4px 7px;border:1px solid var(--border);border-radius:6px;background:var(--surface2);">'
         +'</div>';
     }).join('');
@@ -2597,12 +2600,12 @@ function confirmPortfolioUpdates(){
 
   // Apply updates to existing clients (read live values from inputs)
   mergedUpdates.forEach((u,i)=>{
-    const chk=document.getElementById('pu-chk-'+i);
+    const chk=document.getElementById(DOM_ID.puChk(i));
     if(!chk||!chk.checked)return;
     const cl=(person.clients||[]).find(c=>c.client.toUpperCase()===u.client.toUpperCase());
     if(!cl)return;
-    const meteoEl=document.getElementById('pu-meteo-'+i);
-    const commentEl=document.getElementById('pu-comment-'+i);
+    const meteoEl=document.getElementById(DOM_ID.puMeteo(i));
+    const commentEl=document.getElementById(DOM_ID.puComment(i));
     if(meteoEl) cl.meteo=meteoEl.value;
     if(commentEl) cl.comment=commentEl.value.trim();
     updated++;
@@ -2611,11 +2614,11 @@ function confirmPortfolioUpdates(){
   // Add new projects (read live values from inputs)
   newProjects.forEach((u,i)=>{
     const ni=mergedUpdates.length+i;
-    const chk=document.getElementById('pu-chk-'+ni);
+    const chk=document.getElementById(DOM_ID.puChk(ni));
     if(!chk||!chk.checked)return;
     if(!person.clients) person.clients=[];
-    const meteoEl=document.getElementById('pu-meteo-'+ni);
-    const commentEl=document.getElementById('pu-comment-'+ni);
+    const meteoEl=document.getElementById(DOM_ID.puMeteo(ni));
+    const commentEl=document.getElementById(DOM_ID.puComment(ni));
     person.clients.push({
       client:u.client,
       comment:commentEl?commentEl.value.trim():(u.commentaire||''),
