@@ -759,26 +759,38 @@ function defaultData(){return{
   activityProjects:[]
 };}
 
+const SCHEMA_VERSION=1;
+
 function migrateData(db){
-  if(!db.activityProjects) db.activityProjects=[];
-  const validMeteo=['','vert','jaune','orange','rouge'];
-  (db.people||[]).forEach(p=>{
-    (p.clients||[]).forEach(cl=>{
-      if(!validMeteo.includes(cl.meteo)) cl.meteo='';
+  const version=db._schemaVersion||0;
+
+  if(version<1){
+    // v1 : init activityProjects, correction météo invalide,
+    //      suppression champs profil obsolètes, init slots/specialties
+    if(!db.activityProjects) db.activityProjects=[];
+    const validMeteo=['','vert','jaune','orange','rouge'];
+    (db.people||[]).forEach(p=>{
+      (p.clients||[]).forEach(cl=>{
+        if(!validMeteo.includes(cl.meteo)) cl.meteo='';
+      });
+      if(p.profile){
+        delete p.profile.dateNaissance;
+        delete p.profile.email;
+        delete p.profile.tel;
+      }
     });
-    if(p.profile){
-      delete p.profile.dateNaissance;
-      delete p.profile.email;
-      delete p.profile.tel;
+    if(!db.settings.slots||!db.settings.slots.length){
+      db.settings.slots=defaultData().settings.slots;
     }
-  });
-  // Ensure settings has slots and specialties
-  if(!db.settings.slots||!db.settings.slots.length){
-    db.settings.slots=defaultData().settings.slots;
+    if(!db.settings.specialties||!db.settings.specialties.length){
+      db.settings.specialties=defaultData().settings.specialties;
+    }
+    db._schemaVersion=1;
   }
-  if(!db.settings.specialties||!db.settings.specialties.length){
-    db.settings.specialties=defaultData().settings.specialties;
-  }
+
+  // Futures migrations :
+  // if(db._schemaVersion<2){ ... db._schemaVersion=2; }
+
   return db;
 }
 function loadData(){
