@@ -1385,6 +1385,29 @@ function getApiKey(){
     || '';
 }
 
+// ── ÉTAT DOM — MODAL SAISIE IA (#paste-step2) ────────────────────────────────
+// personId et portfolioUpdates sont écrits par displayGenerated,
+// lus et mis à jour par applyPortfolioUpdates et saveGenerated.
+function getStep2PersonId(){return document.getElementById('paste-step2').dataset.personId||'';}
+function setStep2PersonId(pid){document.getElementById('paste-step2').dataset.personId=pid;}
+function getStep2PortfolioUpdates(){try{return JSON.parse(document.getElementById('paste-step2').dataset.portfolioUpdates||'{}')}catch(e){return{};}}
+function setStep2PortfolioUpdates(obj){document.getElementById('paste-step2').dataset.portfolioUpdates=JSON.stringify(obj);}
+
+// ── ÉTAT DOM — MODAL PORTEFEUILLE (#portfolio-update-list) ───────────────────
+// mergedUpdates, newProjects et personId sont écrits par openPortfolioModal,
+// lus et mis à jour par addManualProjectToModal et confirmPortfolioUpdates.
+function getPortfolioListEl(){return document.getElementById('portfolio-update-list');}
+function getPortfolioPersonId(){return getPortfolioListEl().dataset.personId||'';}
+function getMergedUpdates(){try{return JSON.parse(getPortfolioListEl().dataset.mergedUpdates||'[]')}catch(e){return[];}}
+function getNewProjects(){try{return JSON.parse(getPortfolioListEl().dataset.newProjects||'[]')}catch(e){return[];}}
+function setPortfolioState(personId,mergedUpdates,newProjects){
+  const list=getPortfolioListEl();
+  list.dataset.personId=personId;
+  list.dataset.mergedUpdates=JSON.stringify(mergedUpdates);
+  list.dataset.newProjects=JSON.stringify(newProjects);
+}
+function setNewProjects(arr){getPortfolioListEl().dataset.newProjects=JSON.stringify(arr);}
+
 // ── PROMPTS IA ──────────────────────────────────────────────────────────────
 const AI_PROMPT_PREPARATION=`Tu es un assistant de management. Tu prépares un entretien 1-to-1 pour un manager.
 À partir de l'historique des entretiens, du portefeuille projets et des actions ouvertes, génère une fiche de préparation en HTML simple.
@@ -2058,8 +2081,8 @@ function fillGeneratedForm(parsed,personId){
   });
 
   // store personId + portfolio_updates for saving
-  document.getElementById('paste-step2').dataset.personId=personId;
-  document.getElementById('paste-step2').dataset.portfolioUpdates=JSON.stringify(parsed.portfolio_updates||{});
+  setStep2PersonId(personId);
+  setStep2PortfolioUpdates(parsed.portfolio_updates||{});
 
   // Portfolio update button — toujours visible si le collaborateur a des projets
   // Normalise portfolio data regardless of shape
@@ -2086,7 +2109,7 @@ function fillGeneratedForm(parsed,personId){
 }
 
 function saveGenerated(){
-  const personId=document.getElementById('paste-step2').dataset.personId;
+  const personId=getStep2PersonId();
   const date=document.getElementById('gen-date').value;
   if(!personId||!date){alert('Date manquante.');return;}
   const tags=document.getElementById('gen-tags').value.split(',').map(t=>t.trim()).filter(Boolean);
@@ -2437,7 +2460,7 @@ async function analyseEntretienPortfolio(pid, eid){
 
 async function applyPortfolioUpdates(){
   const step2=document.getElementById('paste-step2');
-  const personId=step2.dataset.personId;
+  const personId=getStep2PersonId();
   const person=byId(personId);if(!person)return;
   const btn=document.getElementById('btn-update-portfolio');
 
@@ -2463,7 +2486,7 @@ async function applyPortfolioUpdates(){
       const raw=(data.content?.map(b=>b.text||'').join('')||'').trim();
       if(!raw){throw new Error('Réponse vide de l\'API.');}
       const parsed=JSON.parse(raw.replace(/```json|```/g,'').trim());
-      step2.dataset.portfolioUpdates=JSON.stringify(parsed);
+      setStep2PortfolioUpdates(parsed);
       btn.dataset.preloaded='1';
     }catch(err){
       btn.textContent=origText;btn.disabled=false;
@@ -2472,9 +2495,7 @@ async function applyPortfolioUpdates(){
     btn.textContent=origText;btn.disabled=false;
   }
 
-  const raw=step2.dataset.portfolioUpdates||'{}';
-  let parsed={};
-  try{ parsed=JSON.parse(raw); }catch(e){}
+  const parsed=getStep2PortfolioUpdates();
   const updates=parsed.updates||parsed.portfolio_updates||[];
   const newProjects=parsed.new_projects||[];
   if(!updates.length&&!newProjects.length){toast('Aucun projet identifié dans ces notes');return;}
@@ -2552,11 +2573,9 @@ function openPortfolioModal(personId, updates, newProjects){
     }).join('');
   }
 
-  const list=document.getElementById('portfolio-update-list');
+  const list=getPortfolioListEl();
   list.innerHTML=html;
-  list.dataset.mergedUpdates=JSON.stringify(mergedUpdates);
-  list.dataset.newProjects=JSON.stringify(validNew);
-  list.dataset.personId=personId;
+  setPortfolioState(personId,mergedUpdates,validNew);
 
   // Style meteo selects
   requestAnimationFrame(()=>{
@@ -2581,7 +2600,7 @@ function updatePortfolioRowMeteo(sel){
 function addManualProjectToModal(){
   const name=document.getElementById('pu-new-client').value.trim();
   if(!name){document.getElementById('pu-new-client').focus();toast('Saisissez un nom de projet');return;}
-  const personId=document.getElementById('portfolio-update-list').dataset.personId;
+  const personId=getPortfolioPersonId();
   const person=byId(personId);if(!person)return;
   // Check not already in portfolio
   if((person.clients||[]).some(cl=>cl.client.toUpperCase()===name.toUpperCase())){
@@ -2590,23 +2609,21 @@ function addManualProjectToModal(){
   const statut=document.getElementById('pu-new-statut').value||'RUN';
   const meteo=document.getElementById('pu-new-meteo').value||'';
   const comment=document.getElementById('pu-new-comment').value.trim();
-  // Add to newProjects dataset
-  const list=document.getElementById('portfolio-update-list');
-  let validNew=JSON.parse(list.dataset.newProjects||'[]');
+  // Add to newProjects state
+  const validNew=getNewProjects();
   validNew.push({client:name,statut,meteo,commentaire:comment});
-  list.dataset.newProjects=JSON.stringify(validNew);
+  setNewProjects(validNew);
   // Re-open modal with updated data
-  const mergedUpdates=JSON.parse(list.dataset.mergedUpdates||'[]');
+  const mergedUpdates=getMergedUpdates();
   openPortfolioModal(personId, mergedUpdates.map(u=>({...u,_fromIA:u._fromIA})), validNew);
   toast(name+' ajouté ✓');
 }
 
 function confirmPortfolioUpdates(){
-  const list=document.getElementById('portfolio-update-list');
-  const personId=list.dataset.personId;
+  const personId=getPortfolioPersonId();
   const person=byId(personId);if(!person)return;
-  const mergedUpdates=JSON.parse(list.dataset.mergedUpdates||'[]');
-  const newProjects=JSON.parse(list.dataset.newProjects||'[]');
+  const mergedUpdates=getMergedUpdates();
+  const newProjects=getNewProjects();
   let updated=0, added=0;
 
   // Apply updates to existing clients (read live values from inputs)
