@@ -2925,7 +2925,7 @@ function syncActivityFromPortfolios(){
     });
   });
   const prevCount=db.activityProjects.length;
-  let added=0;
+  let added=0,updated=0;
   // Rebuild from source of truth: only keep projects that exist in portfolios
   db.activityProjects=Object.values(projectMap).map(proj=>{
     const existing=db.activityProjects.find(ap=>ap.name.toUpperCase()===proj.name.toUpperCase());
@@ -2943,18 +2943,22 @@ function syncActivityFromPortfolios(){
     });
     // Project-level: pilot+pilotName are manually managed → preserved.
     // statut/avancement/dateFin/meteo come from the portfolio (source of truth).
-    return{
-      ...existing,
-      statut:   proj.statut   || existing.statut,
-      avancement: proj.avancement || existing.avancement,
-      dateFin:  proj.dateFin  || existing.dateFin,
-      meteo:    proj.meteo    || existing.meteo,
-      consultants
-    };
+    const newStatut    =proj.statut     ||existing.statut;
+    const newAvancement=proj.avancement ||existing.avancement;
+    const newDateFin   =proj.dateFin    ||existing.dateFin;
+    const newMeteo     =proj.meteo      ||existing.meteo;
+    const fieldChanged =newStatut!==existing.statut||newAvancement!==existing.avancement||newDateFin!==existing.dateFin||newMeteo!==existing.meteo;
+    const consChanged  =consultants.length!==existing.consultants.length||consultants.some((c,i)=>{const e=existing.consultants[i];return!e||c.personId!==e.personId||c.comment!==e.comment;});
+    if(fieldChanged||consChanged)updated++;
+    return{...existing,statut:newStatut,avancement:newAvancement,dateFin:newDateFin,meteo:newMeteo,consultants};
   });
   const removed=prevCount-(db.activityProjects.length-added);
   saveData();renderActivity();
-  const parts=[added?`${added} projet${added>1?'s':''} ajouté${added>1?'s':''}`:null,removed?`${removed} supprimé${removed>1?'s':''}`:null];
+  const parts=[
+    added   ?`${added}    ajouté${added>1?'s':''}` :null,
+    updated ?`${updated}  mis à jour`               :null,
+    removed ?`${removed}  supprimé${removed>1?'s':''}`:null
+  ];
   toast(`Sync : ${parts.filter(Boolean).join(', ')||'aucun changement'} ✓`);
 }
 
