@@ -250,6 +250,17 @@
   .act-meteo-select{font-size:10px;font-weight:700;letter-spacing:.3px;padding:3px 8px;border-radius:20px;cursor:pointer;outline:none;border:none;font-family:'Arial',sans-serif;appearance:none;-webkit-appearance:none;text-align:center;}
   .act-statut-pill{display:inline-block;font-size:10px;font-weight:700;letter-spacing:.4px;padding:2px 7px;border-radius:10px;cursor:pointer;user-select:none;}
   .act-nb-consultants{font-size:10px;color:var(--text3);font-weight:400;margin-left:6px;}
+  /* ── Tooltip commentaire suivi activité ───────────────────────────────────── */
+  #act-comment-tooltip{
+    position:fixed;z-index:9999;display:none;
+    max-width:420px;min-width:180px;
+    background:#fff;color:var(--text);
+    border:1px solid var(--border);border-radius:8px;
+    box-shadow:0 6px 24px rgba(0,0,0,.15);
+    padding:10px 14px;font-size:12px;line-height:1.6;
+    white-space:pre-wrap;word-break:break-word;
+    pointer-events:auto;
+  }
 </style>
   <script src="https://cdn.jsdelivr.net/npm/xlsx-js-style@1.2.0/dist/xlsx.bundle.js"></script>
 </head>
@@ -2987,7 +2998,7 @@ function renderProjectRow(proj, pi){
       <td style="text-align:center;" onclick="event.stopPropagation();">
         <select class="act-meteo-select" onchange="saveActMeteo(${pi},this)" style="${meteoSelectStyle(proj.meteo)}">${METEO_OPTIONS.map(mo=>`<option value="${mo.val}" ${proj.meteo===mo.val?'selected':''}>${mo.label}</option>`).join('')}</select>
       </td>
-      <td onclick="event.stopPropagation();"><textarea class="act-input" onblur="saveActField(${pi},'comment',this.value)" placeholder="Commentaire…" rows="1">${(proj.comment||'').replace(/</g,'&lt;')}</textarea></td>
+      <td onclick="event.stopPropagation();"><textarea class="act-input act-comment-tip" onblur="saveActField(${pi},'comment',this.value)" placeholder="Commentaire…" rows="1">${(proj.comment||'').replace(/</g,'&lt;')}</textarea></td>
     </tr>`;
 }
 
@@ -3004,7 +3015,7 @@ function renderConsultantRow(cons, ci, pi, projMeteo){
           ${METEO_OPTIONS.filter(mo=>mo.val).map(mo=>`<option value="${mo.val}" ${consMeteo===mo.val?'selected':''}>${mo.label}</option>`).join('')}
         </select>
       </td>
-      <td><textarea class="act-input" onblur="saveConsField(${pi},${ci},'comment',this.value)" placeholder="Commentaire consultant…" rows="1">${(cons.comment||'').replace(/</g,'&lt;')}</textarea></td>
+      <td><textarea class="act-input act-comment-tip" onblur="saveConsField(${pi},${ci},'comment',this.value)" placeholder="Commentaire consultant…" rows="1">${(cons.comment||'').replace(/</g,'&lt;')}</textarea></td>
     </tr>`;
 }
 
@@ -3166,6 +3177,61 @@ function exportActivityExcel(){
   toast('Export téléchargé ✓');
 }
 
+// ── Tooltip commentaire suivi activité ────────────────────────────────────────
+(function(){
+  const TIP_OFFSET=12;        // px entre le curseur et le coin du tooltip
+  const HIDE_DELAY=120;       // ms avant masquage (laisse le temps de glisser sur le tooltip)
+  const MIN_LEN=30;           // longueur minimale pour afficher le tooltip
+  let hideTimer=null;
+  const tip=document.getElementById('act-comment-tooltip');
+
+  function show(text,e){
+    if(!text||text.length<MIN_LEN){hide();return;}
+    clearTimeout(hideTimer);
+    tip.textContent=text;
+    position(e);
+    tip.style.display='block';
+  }
+  function position(e){
+    const vw=window.innerWidth,vh=window.innerHeight;
+    const tw=Math.min(420,vw-24);
+    tip.style.maxWidth=tw+'px';
+    let x=e.clientX+TIP_OFFSET, y=e.clientY+TIP_OFFSET;
+    // Forcer dans le viewport après un repaint pour avoir la vraie hauteur
+    requestAnimationFrame(()=>{
+      const th=tip.offsetHeight;
+      if(x+tw>vw-8)x=e.clientX-tw-TIP_OFFSET;
+      if(y+th>vh-8)y=e.clientY-th-TIP_OFFSET;
+      tip.style.left=Math.max(8,x)+'px';
+      tip.style.top =Math.max(8,y)+'px';
+    });
+  }
+  function scheduleHide(){hideTimer=setTimeout(()=>{tip.style.display='none';},HIDE_DELAY);}
+  function hide(){clearTimeout(hideTimer);tip.style.display='none';}
+
+  tip.addEventListener('mouseenter',()=>clearTimeout(hideTimer));
+  tip.addEventListener('mouseleave',scheduleHide);
+
+  // Délégation ciblée sur les textareas portant la classe act-comment-tip
+  document.addEventListener('mouseenter',e=>{
+    const ta=e.target.closest('.act-comment-tip');
+    if(!ta)return;
+    show(ta.value,e);
+  },true);
+  document.addEventListener('mousemove',e=>{
+    if(tip.style.display==='none')return;
+    const ta=e.target.closest('.act-comment-tip');
+    if(ta)position(e);
+  },true);
+  document.addEventListener('mouseleave',e=>{
+    const ta=e.target.closest('.act-comment-tip');
+    if(!ta)return;
+    scheduleHide();
+  },true);
+})();
+
 </script>
+<!-- ── Tooltip commentaire suivi activité ──────────────────────────────────── -->
+<div id="act-comment-tooltip"></div>
 </body>
 </html>
