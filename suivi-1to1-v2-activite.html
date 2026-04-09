@@ -2924,20 +2924,23 @@ function syncActivityFromPortfolios(){
       }
     });
   });
-  let added=0,updated=0;
-  Object.values(projectMap).forEach(proj=>{
+  const prevCount=db.activityProjects.length;
+  let added=0;
+  // Rebuild from source of truth: only keep projects that exist in portfolios
+  db.activityProjects=Object.values(projectMap).map(proj=>{
     const existing=db.activityProjects.find(ap=>ap.name.toUpperCase()===proj.name.toUpperCase());
     if(!existing){
-      db.activityProjects.push({id:uid(),name:proj.name,pilot:'',pilotName:'',statut:proj.statut,avancement:proj.avancement,dateFin:proj.dateFin,meteo:proj.meteo,comment:proj.comment,consultants:proj.consultants});
       added++;
-    } else {
-      proj.consultants.forEach(nc=>{
-        if(!existing.consultants.find(ec=>ec.personId===nc.personId)){existing.consultants.push(nc);updated++;}
-      });
+      return{id:uid(),name:proj.name,pilot:'',pilotName:'',statut:proj.statut,avancement:proj.avancement,dateFin:proj.dateFin,meteo:proj.meteo,comment:proj.comment,consultants:proj.consultants};
     }
+    // Keep manually-edited project fields; rebuild consultants from current portfolio only
+    const consultants=proj.consultants.map(nc=>existing.consultants.find(ec=>ec.personId===nc.personId)||nc);
+    return{...existing,consultants};
   });
+  const removed=prevCount-(db.activityProjects.length-added);
   saveData();renderActivity();
-  toast(`Sync : ${added} projet${added>1?'s':''} ajouté${added>1?'s':''}, ${updated} consultant${updated>1?'s':''} ajouté${updated>1?'s':''} ✓`);
+  const parts=[added?`${added} projet${added>1?'s':''} ajouté${added>1?'s':''}`:null,removed?`${removed} supprimé${removed>1?'s':''}`:null];
+  toast(`Sync : ${parts.filter(Boolean).join(', ')||'aucun changement'} ✓`);
 }
 
 function renderProjectRow(proj, pi){
