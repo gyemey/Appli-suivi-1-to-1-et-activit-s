@@ -3183,7 +3183,10 @@ function exportActivityExcel(){
   const HIDE_DELAY=120;       // ms avant masquage (laisse le temps de glisser sur le tooltip)
   const MIN_LEN=30;           // longueur minimale pour afficher le tooltip
   let hideTimer=null;
-  const tip=document.getElementById('act-comment-tooltip');
+  // Créé en JS pour garantir la disponibilité quel que soit l'ordre du DOM
+  const tip=document.createElement('div');
+  tip.id='act-comment-tooltip';
+  document.body.appendChild(tip);
 
   function show(text,e){
     if(!text||text.length<MIN_LEN){hide();return;}
@@ -3231,7 +3234,5 @@ function exportActivityExcel(){
 })();
 
 </script>
-<!-- ── Tooltip commentaire suivi activité ──────────────────────────────────── -->
-<div id="act-comment-tooltip"></div>
 </body>
 </html>
