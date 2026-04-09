@@ -2933,15 +2933,24 @@ function syncActivityFromPortfolios(){
       added++;
       return{id:uid(),name:proj.name,pilot:'',pilotName:'',statut:proj.statut,avancement:proj.avancement,dateFin:proj.dateFin,meteo:proj.meteo,comment:proj.comment,consultants:proj.consultants};
     }
-    // Keep manually-edited project fields; rebuild consultants from current portfolio only
-    // For each consultant: keep chargeRestante+meteo (manually set in consolidated),
-    // but always refresh comment from the portfolio (source of truth)
+    // Rebuild consultants from current portfolio only.
+    // Per consultant: chargeRestante+meteo are manually managed in consolidated → preserved;
+    // comment comes from the portfolio (source of truth).
     const consultants=proj.consultants.map(nc=>{
       const ec=existing.consultants.find(c=>c.personId===nc.personId);
       if(!ec)return nc;
       return{personId:nc.personId,chargeRestante:ec.chargeRestante||0,meteo:ec.meteo||'',comment:nc.comment||ec.comment||''};
     });
-    return{...existing,consultants};
+    // Project-level: pilot+pilotName are manually managed → preserved.
+    // statut/avancement/dateFin/meteo come from the portfolio (source of truth).
+    return{
+      ...existing,
+      statut:   proj.statut   || existing.statut,
+      avancement: proj.avancement || existing.avancement,
+      dateFin:  proj.dateFin  || existing.dateFin,
+      meteo:    proj.meteo    || existing.meteo,
+      consultants
+    };
   });
   const removed=prevCount-(db.activityProjects.length-added);
   saveData();renderActivity();
