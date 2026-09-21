@@ -390,11 +390,11 @@ let kpiChartQ=null;
 let kpiCurrentView='month';
 
 function loadKpiData(){try{return JSON.parse(localStorage.getItem(KPI_KEY))||[];}catch(e){return[];}}
-function saveKpiData(){localStorage.setItem(KPI_KEY,JSON.stringify(kpiData));}
+function saveKpiData(){localStorage.setItem(KPI_KEY,JSON.stringify(kpiData));scheduleAutoBackup();}
 function loadKpiHistory(){try{return JSON.parse(localStorage.getItem(KPI_HIST_KEY))||[];}catch(e){return[];}}
-function saveKpiHistory(){localStorage.setItem(KPI_HIST_KEY,JSON.stringify(kpiHistory));}
+function saveKpiHistory(){localStorage.setItem(KPI_HIST_KEY,JSON.stringify(kpiHistory));scheduleAutoBackup();}
 function loadKpiLines(){try{return JSON.parse(localStorage.getItem(KPI_LINES_KEY))||{};}catch(e){return{};}}
-function saveKpiLines(){localStorage.setItem(KPI_LINES_KEY,JSON.stringify(kpiLines));}
+function saveKpiLines(){localStorage.setItem(KPI_LINES_KEY,JSON.stringify(kpiLines));scheduleAutoBackup();}
 
 // ── Quarters (Q1=Oct-Nov-Déc, Q2=Jan-Fév-Mar, Q3=Avr-Mai-Jun, Q4=Jul-Aoû-Sep) ──
 function getQuarter(month){ // month = "YYYY-MM"
@@ -1896,11 +1896,12 @@ function exportKpiExcel(){
 
         <div style="margin-top:1.5rem;padding-top:1rem;border-top:1px solid var(--border);">
           <div style="font-size:13px;font-weight:500;margin-bottom:.5rem;">Sauvegarde</div>
-          <div style="display:flex;gap:8px;">
+          <div style="display:flex;gap:8px;flex-wrap:wrap;">
             <button class="btn btn-sm" onclick="exportData()">↓ Exporter JSON</button>
             <label class="btn btn-sm" style="cursor:pointer;">↑ Importer JSON<input type="file" accept=".json" onchange="importData(event)" style="display:none;"></label>
+            <button class="btn btn-sm" onclick="restoreLastLocalBackup()">↺ Restaurer dernière sauvegarde locale</button>
           </div>
-          <div style="font-size:11px;color:var(--text3);margin-top:8px;">Exportez régulièrement pour sauvegarder vos données.</div>
+          <div style="font-size:11px;color:var(--text3);margin-top:8px;">Exportez régulièrement pour sauvegarder vos données. Une sauvegarde automatique locale est aussi conservée dans le navigateur.</div>
         </div>
       </div>
     </div>
@@ -2561,7 +2562,7 @@ function defaultData(){return{
 // ── Clé UI état activité ─────────────────────────────────────────
 const ACT_STATE_KEY = 'suivi1to1_activite_state';
 function loadActState(){ try{return JSON.parse(localStorage.getItem(ACT_STATE_KEY))||{};}catch(e){return{};} }
-function saveActState(s){ localStorage.setItem(ACT_STATE_KEY, JSON.stringify(s)); }
+function saveActState(s){ localStorage.setItem(ACT_STATE_KEY, JSON.stringify(s)); scheduleAutoBackup(); }
 
 // ── Bootstrap db.projects depuis db.people (correspondance approximative) ──
 function normClient(name){ return (name||'').toLowerCase().replace(/[^a-z0-9]/g,'').slice(0,8); }
@@ -2671,12 +2672,69 @@ function loadData(){
     return migrated;
   }catch(e){return defaultData();}
 }
-function saveData(){localStorage.setItem(STORE_KEY,JSON.stringify(db));}
+function saveData(){localStorage.setItem(STORE_KEY,JSON.stringify(db));scheduleAutoBackup();}
 
 let db=loadData();
 let moodState={f:'',gen:''};
 let actionInputCount=0;
 let pendingPersonId=null;
+
+// ── SAUVEGARDE LOCALE REDONDANTE ────────────────────────────────────────────
+// Copie complète (toutes les clés) conservée à part de suivi1to1_v1, pour
+// pouvoir restaurer les données si la clé principale est vidée/corrompue.
+const BACKUP_KEYS=[STORE_KEY,KPI_KEY,KPI_HIST_KEY,KPI_LINES_KEY,ACT_STATE_KEY];
+const LAST_BACKUP_KEY='suivi1to1_last_backup_v1';
+let _autoBackupTimer=null;
+function collectBackupBundle(){
+  const data={};
+  BACKUP_KEYS.forEach(k=>{const v=localStorage.getItem(k);if(v!==null)data[k]=v;});
+  return {__suivi1to1_backup:true,ts:new Date().toISOString(),data};
+}
+function scheduleAutoBackup(){
+  clearTimeout(_autoBackupTimer);
+  _autoBackupTimer=setTimeout(()=>{
+    try{localStorage.setItem(LAST_BACKUP_KEY,JSON.stringify(collectBackupBundle()));}catch(e){}
+  },800);
+}
+function restoreBackupBundle(bundle){
+  if(!bundle||!bundle.data)return false;
+  Object.keys(bundle.data).forEach(k=>localStorage.setItem(k,bundle.data[k]));
+  return true;
+}
+function restoreLastLocalBackup(){
+  const raw=localStorage.getItem(LAST_BACKUP_KEY);
+  if(!raw){alert('Aucune sauvegarde locale trouvée pour le moment.');return;}
+  let backup;try{backup=JSON.parse(raw);}catch(e){alert('Sauvegarde locale illisible.');return;}
+  const dateStr=new Date(backup.ts).toLocaleString('fr-FR');
+  document.getElementById('mc-title').textContent='Restaurer la dernière sauvegarde locale';
+  document.getElementById('mc-msg').textContent='Vos données actuelles seront remplacées par la sauvegarde automatique du '+dateStr+'. Continuer ?';
+  const btn=document.getElementById('mc-btn');
+  btn.textContent='Restaurer';
+  btn.className='btn btn-danger';
+  btn.onclick=()=>{restoreBackupBundle(backup);location.reload();};
+  document.getElementById('modal-confirm').classList.add('open');
+}
+function checkAutoBackupOnOpen(){
+  try{
+    const raw=localStorage.getItem(LAST_BACKUP_KEY);
+    if(!raw)return;
+    const backup=JSON.parse(raw);
+    if(!backup||!backup.data||!backup.data[STORE_KEY])return;
+    const backupDb=JSON.parse(backup.data[STORE_KEY]);
+    const currentEmpty=!db.people||db.people.length===0;
+    const backupHasData=backupDb&&backupDb.people&&backupDb.people.length>0;
+    if(currentEmpty&&backupHasData){
+      const dateStr=new Date(backup.ts).toLocaleString('fr-FR');
+      document.getElementById('mc-title').textContent='Sauvegarde locale disponible';
+      document.getElementById('mc-msg').textContent='Vos données actuelles semblent vides, mais une sauvegarde locale du '+dateStr+' a été trouvée ('+backupDb.people.length+' collaborateur(s)). Recharger cette sauvegarde ?';
+      const btn=document.getElementById('mc-btn');
+      btn.textContent='Recharger la sauvegarde';
+      btn.className='btn btn-accent';
+      btn.onclick=()=>{restoreBackupBundle(backup);location.reload();};
+      document.getElementById('modal-confirm').classList.add('open');
+    }
+  }catch(e){}
+}
 
 // ── UTILS ─────────────────────────────────────────────────────────────────────
 function uid(){return 'i'+Date.now().toString(36)+Math.random().toString(36).slice(2,6);}
@@ -5540,14 +5598,25 @@ function confirmReset(){
   document.getElementById('modal-confirm').classList.add('open');
 }
 function exportData(){
-  const blob=new Blob([JSON.stringify(db,null,2)],{type:'application/json'});
+  const bundle=collectBackupBundle();
+  const blob=new Blob([JSON.stringify(bundle,null,2)],{type:'application/json'});
   const a=document.createElement('a');a.href=URL.createObjectURL(blob);
   a.download='suivi-1to1-'+(db.settings.region||'equipe').replace(/[^a-z0-9]/gi,'_').toLowerCase()+'-'+new Date().toISOString().split('T')[0]+'.json';a.click();
 }
 function importData(e){
   const file=e.target.files[0];if(!file)return;
   const r=new FileReader();
-  r.onload=ev=>{try{db=JSON.parse(ev.target.result);saveData();location.reload();}catch(err){alert('Fichier invalide.');}};
+  r.onload=ev=>{
+    try{
+      const parsed=JSON.parse(ev.target.result);
+      if(parsed&&parsed.__suivi1to1_backup&&parsed.data){
+        restoreBackupBundle(parsed);
+      }else{
+        db=parsed;saveData();
+      }
+      location.reload();
+    }catch(err){alert('Fichier invalide.');}
+  };
   r.readAsText(file);
 }
 
@@ -6275,6 +6344,7 @@ if(!db.settings.myName||!db.settings.region){
   if(b) b.style.display='flex';
 }
 applyModuleVisibility();
+checkAutoBackupOnOpen();
 </script>
 </body>
 </html>
